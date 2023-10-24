@@ -29,7 +29,6 @@ def predict():
     if image_file.filename == '':
         return jsonify({'error': 'Nombre de archivo de imagen no válido'})
 
-    # Lee la imagen y procesa
     image = cv2.imdecode(np.fromstring(image_file.read(), np.uint8), cv2.IMREAD_COLOR)
     imagen_gris = cv2.resize(image, (28, 28), interpolation=cv2.INTER_CUBIC)
     imagen_gris = cv2.cvtColor(imagen_gris, cv2.COLOR_BGR2GRAY)
@@ -37,10 +36,8 @@ def predict():
     imagen_tensor = tf.reshape(imagen_tensor, (1, 28, 28, 1))
 
     prediction = model.predict(imagen_tensor)
-    # Clases posibles
     classes = ["Katakana A", "Katakana E", "Katakana I", "Katakana O", "Katakana U"]
 
-    # Encuentra la clase con la mayor probabilidad
     predicted_class = classes[np.argmax(prediction)]
 
     return jsonify({'prediction': predicted_class})
