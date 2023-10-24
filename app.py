@@ -120,13 +120,11 @@ def main():
 @app.route('/upload', methods=['POST'])
 def upload():
     try:
-        # check if the post request has the file part
         img_data = request.form.get('myImage').replace("data:image/png;base64,","")
         aleatorio = request.form.get('numero')
         print(aleatorio)
         with tempfile.NamedTemporaryFile(delete = False, mode = "w+b", suffix='.png', dir=str(aleatorio)) as fh:
             fh.write(base64.b64decode(img_data))
-        #file = request.files['myImage']
         print("Image uploaded")
     except Exception as err:
         print("Error occurred")
