@@ -3,12 +3,13 @@ import os
 import subprocess
 from flask import Flask, request, render_template, redirect, send_file, jsonify
 from skimage.transform import resize
+from PIL import Image
 from tensorflow.keras.models import load_model
 from skimage import io
 import base64
 import glob
+import zipfile
 import numpy as np
-import cv2
 import tensorflow as tf
 
 app = Flask(__name__)
@@ -154,7 +155,7 @@ def prepare_dataset():
 
 @app.route('/save', methods=['GET'])
 def process_and_save_images():
-    # Load the X.npy file
+
     X_puro = np.load('X.npy')
 
     X = []
@@ -170,9 +171,16 @@ def process_and_save_images():
 
     for i, image in enumerate(X):
         filename = f'{directory_destino}/imagen_{i}.jpg'
-        cv2.imwrite(filename, (image * 255).astype(np.uint8))
+        image = (image * 255).astype(np.uint8)
+        pil_image = Image.fromarray(image)
+        pil_image.save(filename)
 
-    return f'Imagenes .jpg guardadas en "{directory_destino}".'
+    with zipfile.ZipFile('predict_imagenes.zip', 'w', zipfile.ZIP_DEFLATED) as zipf:
+        for root, _, files in os.walk(directory_destino):
+            for file in files:
+                zipf.write(os.path.join(root, file), os.path.relpath(os.path.join(root, file), directory_destino))
+
+    return send_file('predict_imagenes.zip', as_attachment=True)
 
 @app.route('/X.npy', methods=['GET'])
 def download_X():
@@ -187,15 +195,20 @@ def download_y():
 def predict():
     if request.method == 'POST':
         if 'image' not in request.files:
-         return jsonify({'error': 'No se ha proporcionado ninguna imagen'})
+            return jsonify({'error': 'No se ha proporcionado ninguna imagen'})
+        
         image_file = request.files['image']
         if image_file.filename == '':
             return jsonify({'error': 'Nombre de archivo de imagen no válido'})
-        image = cv2.imdecode(np.fromstring(image_file.read(), np.uint8), cv2.IMREAD_COLOR)
-        imagen_gris = cv2.resize(image, (28, 28), interpolation=cv2.INTER_CUBIC)
-        imagen_gris = cv2.cvtColor(imagen_gris, cv2.COLOR_BGR2GRAY)
-        imagen_tensor = tf.cast(imagen_gris, dtype=tf.float32)
+        
+        image = Image.open(image_file)
+        image = image.convert("L") 
+        image = image.resize((28, 28), Image.BICUBIC)
+        
+        imagen_array = np.array(image)
+        imagen_tensor = tf.convert_to_tensor(imagen_array, dtype=tf.float32)
         imagen_tensor = tf.reshape(imagen_tensor, (1, 28, 28, 1))
+        
         prediction = model.predict(imagen_tensor)
 
         classes = ["Katakana A", "Katakana E", "Katakana I", "Katakana O", "Katakana U"]
@@ -204,13 +217,6 @@ def predict():
         return jsonify({'prediction': predicted_class})
     elif request.method == 'GET':
         return render_template("Prediccion.html")
-
-   
-    
-
-
-    
-
 
 @app.route('/predicciones')
 def show_predictions():
